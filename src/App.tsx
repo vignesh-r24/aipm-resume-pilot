@@ -506,29 +506,40 @@ export default function App() {
         </div>
       </main>
 
-      <footer className="mt-auto py-8 text-center border-t border-stone-200/50">
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-sm font-medium text-stone-500">
-            Created by <span className="font-semibold text-teal-600">Vignesh Radhakrishnan</span>
-          </p>
-          <div className="flex items-center gap-4">
+      <footer className="mt-auto py-10 bg-white border-t border-stone-200/60 text-center">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col items-center gap-4">
+          <div className="flex items-center gap-2.5">
+            <span className="text-stone-500 font-medium">Built by</span>
+            <img 
+              src="/profile.jpeg" 
+              alt="Vignesh Radhakrishnan" 
+              style={{ imageRendering: 'high-quality' }}
+              className="w-12 h-12 rounded-full border border-stone-200 shadow-sm object-cover"
+              onError={(e) => {
+                e.currentTarget.src = "https://ui-avatars.com/api/?name=Vignesh+Radhakrishnan&background=0D8B84&color=fff";
+              }}
+            />
+            <span className="font-semibold text-stone-800 text-lg">Vignesh Radhakrishnan</span>
+          </div>
+          
+          <div className="flex items-center justify-center gap-4">
             <a 
               href="https://www.linkedin.com/in/vignesh-radhakrishnan-" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-stone-400 hover:text-teal-600 transition-colors bg-white/50 p-2 rounded-full shadow-sm hover:shadow-md border border-stone-200/50"
+              className="group flex items-center justify-center w-10 h-10 rounded-full bg-stone-50 border border-stone-200 hover:border-[#0A66C2]/30 hover:bg-[#0A66C2]/5 transition-all shadow-sm hover:shadow"
               title="LinkedIn"
             >
-              <Linkedin className="w-4 h-4" />
+              <Linkedin className="w-5 h-5 text-[#0A66C2] group-hover:scale-110 transition-transform" />
             </a>
             <a 
               href="https://github.com/vignesh-r24" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-stone-400 hover:text-teal-600 transition-colors bg-white/50 p-2 rounded-full shadow-sm hover:shadow-md border border-stone-200/50"
+              className="group flex items-center justify-center w-10 h-10 rounded-full bg-stone-50 border border-stone-200 hover:border-[#181717]/30 hover:bg-[#181717]/5 transition-all shadow-sm hover:shadow"
               title="GitHub"
             >
-              <Github className="w-4 h-4" />
+              <Github className="w-5 h-5 text-[#181717] group-hover:scale-110 transition-transform" />
             </a>
           </div>
         </div>
