@@ -1,7 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as pdfjs from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
+import { signInWithGoogle, logout, auth } from './firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 import { 
   FileText, 
@@ -45,6 +47,14 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
     try {
@@ -100,6 +110,11 @@ export default function App() {
   };
 
   const handleEvaluate = async () => {
+    if (!user) {
+      setError('Please sign in to evaluate your resume. You have 1 free evaluation.');
+      return;
+    }
+
     if (!jobDescription || !resume) {
       setError('Please provide both the job description and your resume.');
       return;
@@ -110,14 +125,23 @@ export default function App() {
     setResult(null);
 
     try {
+      const token = await user.getIdToken();
       const response = await fetch('/api/evaluate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ jobDescription, resume }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to connect to the evaluation server.');
+        let errorMessage = 'Failed to connect to the evaluation server.';
+        try {
+          const errorData = await response.json();
+          if (errorData.error) errorMessage = errorData.error;
+        } catch (e) {}
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -139,6 +163,26 @@ export default function App() {
               <Briefcase className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-xl font-display font-bold tracking-tight text-stone-900">AI PM Resume Helper</h1>
+          </div>
+          <div>
+            {user ? (
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-stone-600 hidden sm:inline-block">{user.email}</span>
+                <button
+                  onClick={logout}
+                  className="text-sm font-semibold text-stone-500 hover:text-stone-900 transition-colors"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={signInWithGoogle}
+                className="px-4 py-2 bg-stone-900 text-white rounded-full text-sm font-medium hover:bg-stone-800 transition-colors shadow-md flex items-center gap-2"
+              >
+                Sign in with Google
+              </button>
+            )}
           </div>
         </div>
       </header>

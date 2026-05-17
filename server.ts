@@ -3,14 +3,51 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
+import admin from 'firebase-admin';
 
 dotenv.config();
+
+admin.initializeApp({
+  projectId: "gen-lang-client-0655152792"
+});
 
 const app = express();
 const PORT = 3000;
 
+// Trust the first proxy so rate-limiting works correctly behind Render's load balancer
+app.set('trust proxy', 1);
+
 app.use(express.json({ limit: '10mb' }));
 
+const verifyAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const token = req.headers.authorization?.split('Bearer ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized: Please sign in to evaluate.' });
+  }
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    (req as any).user = decodedToken;
+    next();
+  } catch (error) {
+    console.error('Error verifying auth token', error);
+    return res.status(401).json({ error: 'Unauthorized: Invalid token.' });
+  }
+};
+
+// 1 use per person (Google ID) per 24 hours
+const trialLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hrs
+  limit: 1, 
+  message: { error: 'Trial limit reached: You have used your 1 free evaluation. Please clone the project to use with your own API key.' },
+  standardHeaders: 'draft-7', 
+  legacyHeaders: false, 
+  keyGenerator: (req) => {
+    return (req as any).user?.uid || req.ip || 'unknown';
+  }
+});
+
+// Apply rate limiting exclusively to the evaluation API
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
   httpOptions: {
@@ -68,7 +105,7 @@ You must return a JSON object that strictly follows this schema:
 }
 `;
 
-app.post('/api/evaluate', async (req, res) => {
+app.post('/api/evaluate', verifyAuth, trialLimiter, async (req, res) => {
   try {
     const { jobDescription, resume } = req.body;
 
