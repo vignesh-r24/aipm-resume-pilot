@@ -48,8 +48,20 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [limits, setLimits] = useState<{remaining: number, limit: number} | null>(null);
+
+  const fetchLimits = async () => {
+    try {
+      const res = await fetch('/api/limits');
+      const data = await res.json();
+      setLimits(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
+    fetchLimits();
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
@@ -150,6 +162,7 @@ export default function App() {
       setError(err.message || 'An unexpected error occurred.');
     } finally {
       setLoading(false);
+      fetchLimits();
     }
   };
 
@@ -164,9 +177,15 @@ export default function App() {
             </div>
             <h1 className="text-xl font-display font-bold tracking-tight text-stone-900">AI PM Resume Helper</h1>
           </div>
-          <div>
-            {user ? (
-              <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
+            {limits && (
+              <div className="text-sm font-medium px-3 py-1 bg-stone-100 rounded-full border border-stone-200 text-stone-600 shadow-inner">
+                {limits.remaining} / {limits.limit} <span className="hidden sm:inline">free checks left today</span>
+              </div>
+            )}
+            <div>
+              {user ? (
+                <div className="flex items-center gap-4">
                 <span className="text-sm font-medium text-stone-600 hidden sm:inline-block">{user.email}</span>
                 <button
                   onClick={logout}
@@ -177,12 +196,19 @@ export default function App() {
               </div>
             ) : (
               <button
-                onClick={signInWithGoogle}
+                onClick={async () => {
+                  try {
+                    await signInWithGoogle();
+                  } catch (e: any) {
+                    setError(`Sign-in failed: ${e.message || "Unknown error"}. Check console or try allowing popups/third-party cookies.`);
+                  }
+                }}
                 className="px-4 py-2 bg-stone-900 text-white rounded-full text-sm font-medium hover:bg-stone-800 transition-colors shadow-md flex items-center gap-2"
               >
                 Sign in with Google
               </button>
             )}
+          </div>
           </div>
         </div>
       </header>

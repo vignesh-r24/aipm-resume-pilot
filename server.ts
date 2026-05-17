@@ -3,8 +3,8 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from 'dotenv';
-import rateLimit from 'express-rate-limit';
 import admin from 'firebase-admin';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -35,19 +35,75 @@ const verifyAuth = async (req: express.Request, res: express.Response, next: exp
   }
 };
 
-// 1 use per person (Google ID) per 24 hours
-const trialLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000, // 24 hrs
-  limit: 1, 
-  message: { error: 'Trial limit reached: You have used your 1 free evaluation. Please clone the project to use with your own API key.' },
-  standardHeaders: 'draft-7', 
-  legacyHeaders: false, 
-  keyGenerator: (req) => {
-    return (req as any).user?.uid || req.ip || 'unknown';
+// Simple file-backed persistent rate limiter
+const LIMITS_FILE = path.join(process.cwd(), 'rate-limits.json');
+
+const getLimitsData = () => {
+  if (fs.existsSync(LIMITS_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(LIMITS_FILE, 'utf-8'));
+    } catch(e) {
+      return {};
+    }
   }
+  return {};
+};
+
+const saveLimitsData = (data: any) => {
+  fs.writeFileSync(LIMITS_FILE, JSON.stringify(data, null, 2));
+};
+
+const getTodayStr = () => new Date().toISOString().split('T')[0];
+
+const GLOBAL_LIMIT = 10;
+const USER_LIMIT = 1;
+
+interface RateLimitTracker {
+  global: number;
+  users: Record<string, number>;
+}
+
+const checkRateLimits = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const today = getTodayStr();
+  const data = getLimitsData();
+  
+  if (!data[today]) {
+    data[today] = { global: 0, users: {} };
+  }
+  
+  const todayData = data[today] as RateLimitTracker;
+  const uid = (req as any).user?.uid || req.ip || 'unknown';
+
+  if (todayData.global >= GLOBAL_LIMIT) {
+    return res.status(429).json({ error: 'Global app limit reached: this application only processes 10 resumes per day to conserve API quota. Please come back tomorrow.' });
+  }
+
+  const userUsage = todayData.users[uid] || 0;
+  if (userUsage >= USER_LIMIT) {
+    return res.status(429).json({ error: 'Trial limit reached: You have used your 1 free evaluation. Please come back tomorrow or clone the project.' });
+  }
+
+  // Increment usage
+  todayData.global += 1;
+  todayData.users[uid] = userUsage + 1;
+  
+  // Prune old days to save space
+  for (const dateStr of Object.keys(data)) {
+    if (dateStr !== today) delete data[dateStr];
+  }
+
+  saveLimitsData(data);
+  next();
+};
+
+app.get('/api/limits', (req, res) => {
+  const today = getTodayStr();
+  const data = getLimitsData();
+  const todayData = data[today] || { global: 0 };
+  const remaining = Math.max(0, GLOBAL_LIMIT - todayData.global);
+  res.json({ remaining, limit: GLOBAL_LIMIT });
 });
 
-// Apply rate limiting exclusively to the evaluation API
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
   httpOptions: {
@@ -105,7 +161,7 @@ You must return a JSON object that strictly follows this schema:
 }
 `;
 
-app.post('/api/evaluate', verifyAuth, trialLimiter, async (req, res) => {
+app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
   try {
     const { jobDescription, resume } = req.body;
 
