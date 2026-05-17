@@ -1,5 +1,7 @@
 # AI PM Resume Helper
 
+![AI PM Resume Helper Banner](https://images.unsplash.com/photo-1586281380349-632531db7ed4?q=80&w=2070&auto=format&fit=crop)
+
 An AI-powered evaluation tool designed specifically to help aspiring and current Product Managers tailor their resumes to target job descriptions. By leveraging the advanced reasoning capabilities of Gemini models, this application analyzes your current resume against a specific role and provides comprehensive, actionable feedback.
 
 ## Features
