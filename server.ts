@@ -5,12 +5,37 @@ import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import fs from 'fs';
+import multer from 'multer';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
+
+async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+  const loadingTask = pdfjs.getDocument({ 
+    data: new Uint8Array(buffer),
+    standardFontDataUrl: path.join(process.cwd(), 'node_modules/pdfjs-dist/standard_fonts/')
+  });
+  const pdf = await loadingTask.promise;
+  
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // @ts-ignore
+    const strings = content.items.map((item: any) => item.str);
+    fullText += strings.join(' ') + '\n';
+  }
+  
+  if (!fullText.trim()) {
+    throw new Error('The PDF appears to be empty or contains only images (OCR is not supported).');
+  }
+  return fullText;
+}
 
 dotenv.config();
 
 admin.initializeApp({
   projectId: "gen-lang-client-0655152792"
 });
+
 
 const app = express();
 const PORT = 3000;
@@ -64,6 +89,16 @@ interface RateLimitTracker {
 }
 
 const checkRateLimits = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const user = (req as any).user;
+  
+  if (user && user.email) {
+      const bypassEmailsStr = process.env.RATE_LIMIT_BYPASS_EMAILS || '';
+      const bypassEmails = bypassEmailsStr.split(',').map(e => e.trim().toLowerCase()).filter(e => e);
+      if (bypassEmails.includes(user.email.toLowerCase())) {
+          return next();
+      }
+  }
+
   const today = getTodayStr();
   const data = getLimitsData();
   
@@ -160,6 +195,21 @@ You must return a JSON object that strictly follows this schema:
   }[]
 }
 `;
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+app.post('/api/parse-pdf', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+    const text = await extractTextFromPDF(req.file.buffer);
+    res.json({ text });
+  } catch (error: any) {
+    console.error('PDF Parse Error:', error);
+    res.status(500).json({ error: 'Failed to parse PDF file. Details: ' + (error.message || String(error)) });
+  }
+});
 
 app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
   try {
