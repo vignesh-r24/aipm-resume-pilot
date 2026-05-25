@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { signInWithGoogle, logout, auth } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import LoadingProgress from './components/LoadingProgress';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -434,7 +435,8 @@ export default function App() {
                       <div className="absolute inset-0 border-4 border-teal-200 rounded-full animate-ping opacity-20"></div>
                     </div>
                     <h3 className="text-2xl font-display font-bold relative z-10 text-stone-800">Evaluating your application...</h3>
-                    <p className="text-stone-500 max-w-md text-center">Gemini is analyzing your resume against the job description and industry best practices.</p>
+                    <p className="text-stone-500 max-w-md text-center mb-4">Analyzing your resume against the job description and industry best practices.</p>
+                    <LoadingProgress />
                   </div>
                   <div className="h-48 glass-card animate-pulse rounded-3xl border border-stone-200/50 bg-stone-100/50" />
                   <div className="h-32 glass-card animate-pulse rounded-2xl border border-stone-200/50 bg-stone-100/50" />
@@ -588,7 +590,7 @@ export default function App() {
 
                   <div className="pt-12 pb-8 text-center">
                     <p className="text-sm font-medium text-stone-500 tracking-wider">
-                      Evaluated with Gemini Models & Industry Best Practices.
+                      Evaluated against industry best practices.
                     </p>
                   </div>
                 </motion.div>
