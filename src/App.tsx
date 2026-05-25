@@ -214,7 +214,7 @@ export default function App() {
                   try {
                     await signInWithGoogle();
                   } catch (e: any) {
-                    setError(`Sign-in failed: ${e.message || "Unknown error"}. Check console or try allowing popups/third-party cookies.`);
+                    setError(e.message || "Sign-in failed due to an unknown error.");
                   }
                 }}
                 className="px-4 py-2 bg-stone-900 text-white rounded-full text-sm font-medium hover:bg-stone-800 transition-colors shadow-md flex items-center gap-2"

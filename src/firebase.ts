@@ -30,10 +30,10 @@ export const signInWithGoogle = async () => {
     return result.user;
   } catch (error: any) {
     if (error.code === 'auth/unauthorized-domain') {
-       console.error("Popup failed with unauthorized-domain. Please ensure your domain is whitelisted.");
+       console.error(`Popup failed with unauthorized-domain. Please ensure your domain (${window.location.hostname}) is whitelisted.`);
     }
     console.error("Error signing in with Google", error);
-    throw error;
+    throw new Error(`Sign-in failed: ${error.message}. Please ensure ${window.location.hostname} is added to Authorized Domains in Firebase Auth settings.`);
   }
 };
 
