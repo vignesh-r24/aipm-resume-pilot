@@ -179,12 +179,19 @@ Here are the important rules for your analysis:
 - Provide actionable rewrite suggestions for specific bullet points, particularly focusing on adding evidence, links, and context.
 
 Review the candidate's resume against the job description and best practices provided. How can the candidate improve their resume?
+The overall match score should reflect a weighted combination of the four category sub-scores (brevity, narrative, craft, context) PLUS the overall job description fit analysis.
 
 Think about your evaluation step-by-step before you respond.
 
 You must return a JSON object that strictly follows this schema:
 {
   "overall_fit_score": string (e.g. "85%"),
+  "sub_scores": {
+    "brevity": { "score": number (0-100), "reason": string },
+    "narrative": { "score": number (0-100), "reason": string },
+    "craft": { "score": number (0-100), "reason": string },
+    "context": { "score": number (0-100), "reason": string }
+  },
   "strengths": string[],
   "gaps": string[],
   "violations": string[],
@@ -232,6 +239,16 @@ app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
           type: Type.OBJECT,
           properties: {
             overall_fit_score: { type: Type.STRING },
+            sub_scores: {
+              type: Type.OBJECT,
+              properties: {
+                brevity: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] },
+                narrative: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] },
+                craft: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] },
+                context: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] }
+              },
+              required: ["brevity", "narrative", "craft", "context"]
+            },
             strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
             gaps: { type: Type.ARRAY, items: { type: Type.STRING } },
             violations: { type: Type.ARRAY, items: { type: Type.STRING } },
@@ -248,7 +265,7 @@ app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
               }
             }
           },
-          required: ["overall_fit_score", "strengths", "gaps", "violations", "actionable_suggestions"]
+          required: ["overall_fit_score", "sub_scores", "strengths", "gaps", "violations", "actionable_suggestions"]
         }
       }
     });

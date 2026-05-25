@@ -33,6 +33,12 @@ interface Suggestion {
 
 interface EvaluationData {
   overall_fit_score: string;
+  sub_scores: {
+    brevity: { score: number; reason: string };
+    narrative: { score: number; reason: string };
+    craft: { score: number; reason: string };
+    context: { score: number; reason: string };
+  };
   strengths: string[];
   gaps: string[];
   violations: string[];
@@ -45,9 +51,19 @@ export default function App() {
   const [resumeFileUrl, setResumeFileUrl] = useState<string | null>(null);
   const [resumeFileType, setResumeFileType] = useState<'text' | 'pdf' | null>(null);
   const [numPages, setNumPages] = useState<number | null>(null);
+  const [pageWidth, setPageWidth] = useState(400);
   const [loading, setLoading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [result, setResult] = useState<EvaluationData | null>(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setPageWidth(Math.min(window.innerWidth - 110, 400));
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -173,7 +189,7 @@ export default function App() {
             <div className="bg-gradient-to-tr from-teal-400 to-emerald-400 p-2 rounded-xl shadow-lg shadow-teal-500/20">
               <Briefcase className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-xl font-display font-bold tracking-tight text-stone-900">AI PM Resume Helper</h1>
+            <h1 className="text-xl font-display font-bold tracking-tight text-stone-900">AI PM Resume Lab</h1>
           </div>
           <div className="flex items-center gap-6">
             {limits && (
@@ -222,11 +238,11 @@ export default function App() {
           >
             <div className="space-y-2">
               <h2 className="text-4xl lg:text-5xl font-display font-bold text-stone-900 leading-tight">
-                {loading || result ? 'Update Application' : 'Refine Your Story'} <br/>
+                {loading || result ? 'Run Another Check' : 'Refine Your Story'} <br/>
                 {!loading && !result && <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-emerald-500">Land the PM Role.</span>}
               </h2>
               <p className="text-stone-600 text-lg leading-relaxed">
-                Upload your resume and the target job description. The AI evaluator will analyze them against best practices.
+                Paste a job description and upload your resume. Get feedback on what's working and what to sharpen, based on how top AI PM hiring managers actually screen candidates.
               </p>
             </div>
 
@@ -238,7 +254,7 @@ export default function App() {
                 </label>
                 <textarea
                   className="w-full h-48 p-5 bg-white/50 border border-stone-200 rounded-2xl shadow-inner focus:ring-2 focus:ring-teal-400 focus:border-teal-400 transition-all outline-none resize-none text-sm text-stone-800 leading-relaxed placeholder:text-stone-400 font-sans"
-                  placeholder="Paste the link or the full text of the job description..."
+                  placeholder="Paste the job description or a link to it"
                   value={jobDescription}
                   onChange={(e) => setJobDescription(e.target.value)}
                 />
@@ -332,7 +348,7 @@ export default function App() {
                             <div key={`page_${index + 1}`}>
                               <Page 
                                 pageNumber={index + 1} 
-                                width={400} 
+                                width={pageWidth} 
                                 className="mb-4 shadow-sm bg-white"
                               />
                             </div>
@@ -395,9 +411,9 @@ export default function App() {
                   <div className="w-24 h-24 bg-stone-50 shadow-inner rounded-full flex items-center justify-center mb-8 border border-stone-100">
                     <Loader2 className="w-12 h-12 text-stone-400" />
                   </div>
-                  <h3 className="text-2xl font-display font-semibold text-stone-700 mb-3 tracking-wide">Awaiting Inputs</h3>
+                  <h3 className="text-2xl font-display font-semibold text-stone-700 mb-3 tracking-wide">Ready When You Are</h3>
                   <p className="text-stone-500 max-w-sm text-lg">
-                    Your detailed evaluation report will appear here once you submit your materials.
+                    Your evaluation will show up here once you hit submit.
                   </p>
                 </motion.div>
               )}
@@ -433,19 +449,42 @@ export default function App() {
                   className="space-y-6 w-full"
                 >
                   {/* Score Card */}
-                  <div className="glass-panel p-8 rounded-3xl overflow-hidden relative group">
-                    <div className="absolute right-0 top-0 w-64 h-64 bg-gradient-to-bl from-teal-50 to-emerald-50 rounded-full blur-3xl -mr-20 -mt-20 z-0 transition-opacity opacity-70 group-hover:opacity-100" />
-                    <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-                      <div>
+                  <div className="glass-panel p-6 sm:p-8 rounded-3xl overflow-hidden relative group">
+                    <div className="absolute right-0 top-0 w-64 h-64 bg-gradient-to-bl from-teal-50 to-emerald-50 rounded-full blur-3xl -mr-20 -mt-20 z-0 transition-opacity opacity-70 group-hover:opacity-100 pointer-events-none" />
+                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-10">
+                      
+                      {/* Overall Score */}
+                      <div className="flex-shrink-0 w-full md:w-auto text-center md:text-left">
                         <h4 className="text-sm font-bold text-teal-600 uppercase tracking-widest mb-2 font-display">Overall Match Score</h4>
-                        <div className="flex items-baseline gap-3">
-                          <span className="text-7xl lg:text-8xl font-display font-black tracking-tighter text-stone-900">{result.overall_fit_score}</span>
+                        <div className="flex items-baseline justify-center md:justify-start gap-3">
+                          <span className="text-6xl sm:text-7xl lg:text-8xl font-display font-black tracking-tighter text-stone-900 leading-none">{result.overall_fit_score}</span>
                           <span className="text-stone-500 font-medium text-lg lg:text-xl">compatibility</span>
                         </div>
                       </div>
-                      <div className="bg-gradient-to-br from-teal-400 to-emerald-400 p-6 rounded-3xl shadow-[0_0_30px_rgba(45,212,191,0.3)] shadow-teal-500/20 border border-teal-300">
-                        <CheckCircle2 className="w-12 h-12 text-white" />
+
+                      {/* Sub Scores */}
+                      <div className="flex-1 w-full grid grid-cols-1 gap-4 md:border-l md:border-stone-200 md:pl-10 pt-6 md:pt-0 border-t border-stone-100 md:border-t-0">
+                        {[
+                          { label: 'Brevity & Focus', data: result.sub_scores?.brevity },
+                          { label: 'Narrative & Story', data: result.sub_scores?.narrative },
+                          { label: 'Craft & Detail', data: result.sub_scores?.craft },
+                          { label: 'Context & Clarity', data: result.sub_scores?.context },
+                        ].map((info, idx) => info.data && (
+                          <div key={idx} className="flex flex-col group/score cursor-default">
+                            <div className="flex justify-between items-end mb-1.5">
+                              <span className="text-xs font-bold uppercase tracking-widest text-stone-600">{info.label}</span>
+                              <span className="text-xs font-bold text-stone-800">{info.data.score}/100</span>
+                            </div>
+                            <div className="w-full bg-stone-100/80 rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className="bg-gradient-to-r from-teal-400 to-emerald-400 h-full rounded-full transition-all duration-1000 ease-out" 
+                                style={{ width: `${Math.max(0, Math.min(100, info.data.score))}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
                       </div>
+
                     </div>
                   </div>
 
@@ -481,10 +520,10 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Best Practice Violations */}
+                  {/* Areas to Improve */}
                   {result.violations.length > 0 && (
                     <div className="bg-rose-50 border border-rose-100 p-8 rounded-3xl">
-                      <h4 className="text-sm font-bold text-rose-600 uppercase tracking-widest mb-5">Best Practice Violations</h4>
+                      <h4 className="text-sm font-bold text-rose-600 uppercase tracking-widest mb-5">Areas to Improve</h4>
                       <div className="space-y-4">
                         {result.violations.map((v, i) => (
                           <div key={i} className="flex gap-4 items-start bg-white p-5 rounded-2xl border border-rose-100 shadow-sm">
@@ -496,28 +535,49 @@ export default function App() {
                     </div>
                   )}
 
+                  {/* Best Practices Reference */}
+                  <div className="bg-blue-50/50 border border-blue-100 p-6 sm:p-8 rounded-3xl">
+                    <h4 className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-3">Recommended Reading</h4>
+                    <p className="text-blue-800 text-base leading-relaxed">
+                      These insights were based on best practices from this article:{' '}
+                      <a 
+                        href="https://blog.jaclynkonzelmann.com/p/what-i-look-for-in-an-ai-pm-part" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="font-bold underline decoration-blue-300 underline-offset-4 hover:text-blue-900 transition-colors"
+                      >
+                        What I Look for in an AI PM
+                      </a>.
+                    </p>
+                  </div>
+
                   {/* Actionable Suggestions */}
                   <div className="space-y-6 pt-6">
-                    <h4 className="text-3xl font-display font-bold text-stone-900 px-2 lg:px-4">Actionable Rewrites</h4>
+                    <div className="px-2 lg:px-4">
+                      <h4 className="text-3xl font-display font-bold text-stone-900">Actionable Rewrites</h4>
+                      <p className="mt-2 text-sm text-stone-500/80 font-medium tracking-wide">
+                        These are starting points, not copy-paste answers. The best resume still sounds like you.
+                      </p>
+                    </div>
                     <div className="grid gap-8 lg:px-4">
                       {result.actionable_suggestions.map((item, i) => (
                         <div key={i} className="glass-panel rounded-3xl overflow-hidden border border-stone-200 group shadow-xl">
                           <div className="p-8 border-b border-stone-100 bg-stone-50/50">
                             <div className="text-sm font-bold text-stone-500 uppercase tracking-widest mb-4">Original Context</div>
-                            <p className="text-base text-stone-500 line-through decoration-stone-300 italic leading-relaxed">{item.original}</p>
+                            <p className="text-base text-stone-500 line-through decoration-stone-300 italic leading-relaxed break-words whitespace-pre-wrap">{item.original}</p>
                           </div>
                           <div className="p-8 space-y-6 bg-white/50">
                             <div>
-                              <div className="text-sm font-bold text-teal-600 uppercase tracking-widest mb-4">Elite Rewrite</div>
+                              <div className="text-sm font-bold text-teal-600 uppercase tracking-widest mb-4">Suggested Rewrite</div>
                               <div className="flex gap-5 bg-teal-50/50 p-6 rounded-2xl border border-teal-100/50 shadow-inner group-hover:bg-teal-50 transition-colors">
                                 <ArrowRight className="w-6 h-6 text-teal-600 flex-shrink-0 mt-0.5" />
-                                <p className="text-base font-semibold text-stone-800 leading-relaxed italic">
+                                <p className="text-base font-semibold text-stone-800 leading-relaxed italic break-words whitespace-pre-wrap overflow-hidden">
                                   {item.suggestion}
                                 </p>
                               </div>
                             </div>
                             <div>
-                              <div className="text-sm font-bold text-stone-500 uppercase tracking-widest mb-3">Expert Reasoning</div>
+                              <div className="text-sm font-bold text-stone-500 uppercase tracking-widest mb-3">Reasoning</div>
                               <p className="text-base text-stone-600 leading-relaxed">{item.reasoning}</p>
                             </div>
                           </div>
@@ -528,7 +588,7 @@ export default function App() {
 
                   <div className="pt-12 pb-8 text-center">
                     <p className="text-sm font-medium text-stone-500 tracking-wider">
-                      Evaluated with Gemini Models & Elite Industry Heuristics.
+                      Evaluated with Gemini Models & Industry Best Practices.
                     </p>
                   </div>
                 </motion.div>
@@ -573,6 +633,12 @@ export default function App() {
             >
               <Github className="w-5 h-5 text-[#181717] group-hover:scale-110 transition-transform" />
             </a>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t border-stone-100 max-w-[80%] md:max-w-md mx-auto">
+            <p className="text-sm text-stone-500 leading-relaxed">
+              Resume best practices derived from insights by <a href="https://www.linkedin.com/in/jaclynkonzelmann/" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:text-teal-700 font-medium hover:underline transition-colors whitespace-nowrap">Jaclyn Konzelmann</a>.
+            </p>
           </div>
         </div>
       </footer>
