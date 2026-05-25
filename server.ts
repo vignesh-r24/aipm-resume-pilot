@@ -6,9 +6,9 @@ import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import fs from 'fs';
 import multer from 'multer';
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+  const pdfjs = await Function('return import("pdfjs-dist/legacy/build/pdf.mjs")')();
   const loadingTask = pdfjs.getDocument({ 
     data: new Uint8Array(buffer),
     standardFontDataUrl: path.join(process.cwd(), 'node_modules/pdfjs-dist/standard_fonts/')
@@ -185,6 +185,7 @@ Think about your evaluation step-by-step before you respond.
 
 You must return a JSON object that strictly follows this schema:
 {
+  "candidate_name": string (the extracted candidate's full name from their resume, or empty string if not found),
   "overall_fit_score": string (e.g. "85%"),
   "sub_scores": {
     "brevity": { "score": number (0-100), "reason": string },
@@ -230,45 +231,65 @@ app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
       .replace('{{job_description}}', jobDescription)
       .replace('{{resume}}', resume);
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            overall_fit_score: { type: Type.STRING },
-            sub_scores: {
+    const modelsToTry = ["gemini-3.5-flash", "gemini-1.5-flash"];
+    let response: any = null;
+    let evalError: any = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`Starting content generation with model: ${modelName}`);
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
               type: Type.OBJECT,
               properties: {
-                brevity: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] },
-                narrative: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] },
-                craft: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] },
-                context: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] }
-              },
-              required: ["brevity", "narrative", "craft", "context"]
-            },
-            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-            gaps: { type: Type.ARRAY, items: { type: Type.STRING } },
-            violations: { type: Type.ARRAY, items: { type: Type.STRING } },
-            actionable_suggestions: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  original: { type: Type.STRING },
-                  suggestion: { type: Type.STRING },
-                  reasoning: { type: Type.STRING }
+                candidate_name: { type: Type.STRING },
+                overall_fit_score: { type: Type.STRING },
+                sub_scores: {
+                  type: Type.OBJECT,
+                  properties: {
+                    brevity: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] },
+                    narrative: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] },
+                    craft: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] },
+                    context: { type: Type.OBJECT, properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } }, required: ["score", "reason"] }
+                  },
+                  required: ["brevity", "narrative", "craft", "context"]
                 },
-                required: ["original", "suggestion", "reasoning"]
-              }
+                strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+                gaps: { type: Type.ARRAY, items: { type: Type.STRING } },
+                violations: { type: Type.ARRAY, items: { type: Type.STRING } },
+                actionable_suggestions: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      original: { type: Type.STRING },
+                      suggestion: { type: Type.STRING },
+                      reasoning: { type: Type.STRING }
+                    },
+                    required: ["original", "suggestion", "reasoning"]
+                  }
+                }
+              },
+              required: ["overall_fit_score", "sub_scores", "strengths", "gaps", "violations", "actionable_suggestions", "candidate_name"]
             }
-          },
-          required: ["overall_fit_score", "sub_scores", "strengths", "gaps", "violations", "actionable_suggestions"]
-        }
+          }
+        });
+        
+        // Succeeded, break loop
+        break;
+      } catch (err: any) {
+        console.warn(`Model ${modelName} failed. Error:`, err?.message || err);
+        evalError = err;
       }
-    });
+    }
+
+    if (!response) {
+      throw evalError || new Error("Failed to evaluate with any of the requested models.");
+    }
 
     const result = JSON.parse(response.text || '{}');
     res.json(result);

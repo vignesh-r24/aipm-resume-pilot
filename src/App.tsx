@@ -33,6 +33,7 @@ interface Suggestion {
 }
 
 interface EvaluationData {
+  candidate_name?: string;
   overall_fit_score: string;
   sub_scores: {
     brevity: { score: number; reason: string };
@@ -106,11 +107,24 @@ export default function App() {
         });
 
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || 'Failed to parse PDF.');
+          let errMsg = 'Failed to parse PDF.';
+          const resText = await res.text();
+          try {
+            const errorData = JSON.parse(resText);
+            errMsg = errorData.error || errMsg;
+          } catch (e) {
+            errMsg = resText || errMsg;
+          }
+          throw new Error(errMsg);
         }
 
-        const data = await res.json();
+        const resText = await res.text();
+        let data;
+        try {
+          data = JSON.parse(resText);
+        } catch (e) {
+          throw new Error(`Invalid server response parsing PDF: ${resText.substring(0, 120)}...`);
+        }
         setResume(data.text);
         setResumeFileUrl(URL.createObjectURL(file));
         setResumeFileType('pdf');
@@ -164,14 +178,23 @@ export default function App() {
 
       if (!response.ok) {
         let errorMessage = 'Failed to connect to the evaluation server.';
+        const evalResText = await response.text();
         try {
-          const errorData = await response.json();
+          const errorData = JSON.parse(evalResText);
           if (errorData.error) errorMessage = errorData.error;
-        } catch (e) {}
+        } catch (e) {
+          errorMessage = evalResText || errorMessage;
+        }
         throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      const evalResText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(evalResText);
+      } catch (e) {
+        throw new Error(`Invalid server response evaluating resume: ${evalResText.substring(0, 120)}...`);
+      }
       setResult(data);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred.');
@@ -450,6 +473,20 @@ export default function App() {
                   animate={{ opacity: 1, y: 0 }}
                   className="space-y-6 w-full"
                 >
+                  {/* Candidate Name Banner */}
+                  <div className="text-center md:text-left pt-2 pb-1">
+                    <span className="text-xs font-bold uppercase tracking-widest text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-100/50 mb-2 inline-block">Evaluation Complete</span>
+                    <h2 className="text-2xl sm:text-3xl font-display font-black text-stone-800 tracking-tight leading-tight">
+                      {result.candidate_name ? (
+                        <>
+                          Resume Evaluation for <span className="text-teal-600 font-extrabold">{result.candidate_name}</span>
+                        </>
+                      ) : (
+                        "Resume Evaluation"
+                      )}
+                    </h2>
+                  </div>
+
                   {/* Score Card */}
                   <div className="glass-panel p-6 sm:p-8 rounded-3xl overflow-hidden relative group">
                     <div className="absolute right-0 top-0 w-64 h-64 bg-gradient-to-bl from-teal-50 to-emerald-50 rounded-full blur-3xl -mr-20 -mt-20 z-0 transition-opacity opacity-70 group-hover:opacity-100 pointer-events-none" />
