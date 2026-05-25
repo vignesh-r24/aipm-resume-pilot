@@ -28,7 +28,10 @@ export const signInWithGoogle = async () => {
   try {
     const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
     return result.user;
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'auth/unauthorized-domain') {
+       console.error("Popup failed with unauthorized-domain. Please ensure your domain is whitelisted.");
+    }
     console.error("Error signing in with Google", error);
     throw error;
   }

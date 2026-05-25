@@ -1,5 +1,5 @@
 {
-  "name": "Elite AI PM Resume Coach",
+  "name": "PM Resume Lab",
   "description": "An AI-powered evaluator that provides actionable feedback for AI Product Management resumes based on industry best practices and specific job descriptions.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
