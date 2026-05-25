@@ -231,7 +231,7 @@ app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
       .replace('{{resume}}', resume);
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -286,7 +286,7 @@ app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
 
     if (errorMessage.includes('NOT_FOUND') || status === 404) {
       return res.status(404).json({ 
-        error: 'The requested model (gemini-3-flash-preview) was not found. This can happen if the API key project is not yet updated to the latest Gemini 3 series.' 
+        error: 'The requested model (gemini-3-flash) was not found. This can happen if the API key project is not yet updated to the latest Gemini series.' 
       });
     }
 
