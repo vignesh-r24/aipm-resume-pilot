@@ -4,6 +4,7 @@ import { signInWithGoogle, logout, auth } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import LoadingProgress from './components/LoadingProgress';
 import { Document, Page, pdfjs } from 'react-pdf';
+import { Analytics } from '@vercel/analytics/react';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -676,6 +677,7 @@ export default function App() {
           </div>
         </div>
       </footer>
+      <Analytics />
     </div>
   );
 }
