@@ -6,28 +6,24 @@ import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import fs from 'fs';
 import multer from 'multer';
+import * as pdf from 'pdf-parse';
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  const pdfjs = await Function('return import("pdfjs-dist/legacy/build/pdf.mjs")')();
-  const loadingTask = pdfjs.getDocument({ 
-    data: new Uint8Array(buffer),
-    standardFontDataUrl: path.join(process.cwd(), 'node_modules/pdfjs-dist/standard_fonts/')
-  });
-  const pdf = await loadingTask.promise;
-  
-  let fullText = '';
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    // @ts-ignore
-    const strings = content.items.map((item: any) => item.str);
-    fullText += strings.join(' ') + '\n';
+  try {
+    // pdf-parse is exported as default in standard commonjs, but TS ES6 definitions use namespace-like bindings
+    // Let's resolve the callable standard dynamically if needed or call pdf.default or pdf directly
+    const parse = (pdf as any).default || pdf;
+    const data = await parse(buffer);
+    const fullText = data.text;
+    
+    if (!fullText || !fullText.trim()) {
+      throw new Error('The PDF appears to be empty or contains only images (OCR is not supported).');
+    }
+    return fullText;
+  } catch (error: any) {
+    console.error('pdf-parse Error:', error);
+    throw new Error('Failed to extract text from PDF file. ' + (error.message || String(error)));
   }
-  
-  if (!fullText.trim()) {
-    throw new Error('The PDF appears to be empty or contains only images (OCR is not supported).');
-  }
-  return fullText;
 }
 
 dotenv.config();
@@ -60,22 +56,28 @@ const verifyAuth = async (req: express.Request, res: express.Response, next: exp
   }
 };
 
-// Simple file-backed persistent rate limiter
-const LIMITS_FILE = path.join(process.cwd(), 'rate-limits.json');
+// Simple file-backed persistent rate limiter with resilient in-memory fallback for read-only environments
+let tempInMemoryLimits: any = {};
+const LIMITS_FILE = path.join('/tmp', 'rate-limits.json');
 
 const getLimitsData = () => {
-  if (fs.existsSync(LIMITS_FILE)) {
-    try {
+  try {
+    if (fs.existsSync(LIMITS_FILE)) {
       return JSON.parse(fs.readFileSync(LIMITS_FILE, 'utf-8'));
-    } catch(e) {
-      return {};
     }
+  } catch (e) {
+    console.warn("Resilient Rate Limiter: Cannot read limits file, falling back to memory.", e);
   }
-  return {};
+  return tempInMemoryLimits;
 };
 
 const saveLimitsData = (data: any) => {
-  fs.writeFileSync(LIMITS_FILE, JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(LIMITS_FILE, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.warn("Resilient Rate Limiter: Cannot write limits file to disk, writing to memory instead.", e);
+    tempInMemoryLimits = data;
+  }
 };
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
