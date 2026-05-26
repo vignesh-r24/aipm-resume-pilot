@@ -6,41 +6,27 @@ import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import fs from 'fs';
 import multer from 'multer';
-import { createRequire } from 'module';
 
-const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse');
+import { PdfReader } from 'pdfreader';
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  try {
-    let parseFunc = pdf;
-    
-    // Check for ESM wrapping that could happen with loaders
-    if (parseFunc && typeof parseFunc !== 'function') {
-      if (typeof parseFunc.default === 'function') {
-        parseFunc = parseFunc.default;
-      } else if (parseFunc.default && typeof parseFunc.default.default === 'function') {
-        parseFunc = parseFunc.default.default;
+  return new Promise((resolve, reject) => {
+    let fullText = '';
+    new PdfReader().parseBuffer(buffer, (err: any, item: any) => {
+      if (err) return reject(new Error('Failed to extract text from PDF file. ' + err));
+      if (!item) {
+        if (!fullText || !fullText.trim()) {
+          return reject(new Error('The PDF appears to be empty or contains only images (OCR is not supported).'));
+        }
+        return resolve(fullText);
       }
-    }
-
-    if (typeof parseFunc !== 'function') {
-      const keys = parseFunc ? Object.keys(parseFunc) : [];
-      throw new Error(`pdf-parse resolution failed. Parsed type of pdf-parse is "${typeof parseFunc}". Available keys: ${JSON.stringify(keys)}`);
-    }
-
-    const data = await parseFunc(buffer);
-    const fullText = data?.text;
-    
-    if (!fullText || !fullText.trim()) {
-      throw new Error('The PDF appears to be empty or contains only images (OCR is not supported).');
-    }
-    return fullText;
-  } catch (error: any) {
-    console.error('pdf-parse Error:', error);
-    throw new Error('Failed to extract text from PDF file. ' + (error.message || String(error)));
-  }
+      if (item.text) {
+        fullText += item.text + ' ';
+      }
+    });
+  });
 }
+
 
 dotenv.config();
 
