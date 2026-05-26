@@ -7,16 +7,31 @@ import admin from 'firebase-admin';
 import fs from 'fs';
 import multer from 'multer';
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
+dotenv.config();
+
+let aiInstance: any = null;
+function getAi() {
+  if (!aiInstance) {
+    aiInstance = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
   }
-});
+  return aiInstance;
+}
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    projectId: "gen-lang-client-0655152792"
+  });
+}
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+  const ai = getAi();
   const response = await ai.models.generateContent({
     model: 'gemini-1.5-flash',
     contents: [
@@ -30,13 +45,6 @@ async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   }
   return text;
 }
-
-
-dotenv.config();
-
-admin.initializeApp({
-  projectId: "gen-lang-client-0655152792"
-});
 
 
 const app = express();
@@ -233,6 +241,8 @@ app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
     const modelsToTry = ["gemini-3.5-flash", "gemini-1.5-flash"];
     let response: any = null;
     let evalError: any = null;
+
+    const ai = getAi();
 
     for (const modelName of modelsToTry) {
       try {

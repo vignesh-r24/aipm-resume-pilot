@@ -183,7 +183,13 @@ export default function App() {
           const errorData = JSON.parse(evalResText);
           if (errorData.error) errorMessage = errorData.error;
         } catch (e) {
-          errorMessage = evalResText || errorMessage;
+          if (evalResText.includes('FUNCTION_INVOCATION_FAILED')) {
+            errorMessage = 'A server error occurred (FUNCTION_INVOCATION_FAILED). The serverless function crashed or timed out. Check environment variables or server logs.';
+          } else {
+            // Strip HTML tags for cleaner error if it's an HTML page
+            const strippedText = evalResText.replace(/<[^>]+>/g, ' ').trim();
+            errorMessage = strippedText.length > 200 ? strippedText.substring(0, 200) + '...' : (strippedText || errorMessage);
+          }
         }
         throw new Error(errorMessage);
       }
