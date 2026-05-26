@@ -29,23 +29,6 @@ if (!admin.apps.length) {
   });
 }
 
-async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  const ai = getAi();
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [
-      { text: 'Extract and return all the text from this resume faithfully. Output strictly the plain text contained in the resume without any markdown formatting or extra conversational text.'},
-      { inlineData: { data: buffer.toString('base64'), mimeType: 'application/pdf' } }
-    ]
-  });
-  const text = response.text;
-  if (!text || text.trim() === '') {
-    throw new Error('The PDF appears to be empty or Gemini could not read it.');
-  }
-  return text;
-}
-
-
 const app = express();
 const PORT = 3000;
 
@@ -210,20 +193,7 @@ You must return a JSON object that strictly follows this schema:
 }
 `;
 
-app.post('/api/parse-pdf', async (req, res) => {
-  try {
-    const { pdfBase64 } = req.body;
-    if (!pdfBase64) {
-      return res.status(400).json({ error: 'No PDF provided.' });
-    }
-    const buffer = Buffer.from(pdfBase64, 'base64');
-    const text = await extractTextFromPDF(buffer);
-    res.json({ text });
-  } catch (error: any) {
-    console.error('PDF Parse Error:', error);
-    res.status(500).json({ error: 'Failed to parse PDF file. Details: ' + (error.message || String(error)) });
-  }
-});
+// evaluate endpoint starts here
 
 app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
   try {
@@ -237,7 +207,9 @@ app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
       .replace('{{job_description}}', jobDescription)
       .replace('{{resume}}', resume);
 
-    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-pro"];
+    const models = ["gemini-3.5-flash", "gemini-3-flash", "gemini-2.5-flash"];
+    // Shuffle the models to load balance across the free limits (20 RPD each)
+    const modelsToTry = models.sort(() => Math.random() - 0.5);
     let response: any = null;
     let evalError: any = null;
 

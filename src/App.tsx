@@ -99,46 +99,22 @@ export default function App() {
     setError(null);
     try {
       if (file.type === 'application/pdf') {
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload = () => resolve((reader.result as string).split(',')[1]);
-          reader.onerror = error => reject(error);
-        });
-
-        const res = await fetch('/api/parse-pdf', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ pdfBase64: base64 }),
-        });
-
-        if (!res.ok) {
-          let errMsg = 'Failed to parse PDF.';
-          const resText = await res.text();
-          try {
-            const errorData = JSON.parse(resText);
-            errMsg = errorData.error || errMsg;
-          } catch (e) {
-            if (resText.includes('FUNCTION_INVOCATION_FAILED')) {
-              errMsg = 'A server error occurred (FUNCTION_INVOCATION_FAILED) while parsing the PDF. The file may be too large or the sever crashed.';
-            } else {
-              const strippedText = resText.replace(/<[^>]+>/g, ' ').trim();
-              errMsg = strippedText.length > 200 ? strippedText.substring(0, 200) + '...' : (strippedText || errMsg);
-            }
-          }
-          throw new Error(errMsg);
+        // Parse PDF entirely on the client side using pdf.js to save RPD and avoid backend errors
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+        let extractedText = '';
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          extractedText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
         }
 
-        const resText = await res.text();
-        let data;
-        try {
-          data = JSON.parse(resText);
-        } catch (e) {
-          throw new Error(`Invalid server response parsing PDF: ${resText.substring(0, 120)}...`);
+        if (!extractedText.trim()) {
+           throw new Error('Our client-side parser could not extract text from this PDF. Please paste your text manually.');
         }
-        setResume(data.text);
+
+        setResume(extractedText);
         setResumeFileUrl(URL.createObjectURL(file));
         setResumeFileType('pdf');
       } else if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
