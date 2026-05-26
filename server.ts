@@ -6,35 +6,36 @@ import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import fs from 'fs';
 import multer from 'multer';
-import * as pdf from 'pdf-parse';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const pdf = require('pdf-parse');
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    const rawPdf: any = pdf;
+    let parseFunc = pdf;
     
-    // Check if modern PDFParse class is exported
-    if (rawPdf && typeof rawPdf.PDFParse === 'function') {
-      const parser = new rawPdf.PDFParse({ data: new Uint8Array(buffer) });
-      const textResult = await parser.getText();
-      const fullText = textResult.text;
-      if (!fullText || !fullText.trim()) {
-        throw new Error('The PDF appears to be empty or contains only images (OCR is not supported).');
+    // Check for ESM wrapping that could happen with loaders
+    if (parseFunc && typeof parseFunc !== 'function') {
+      if (typeof parseFunc.default === 'function') {
+        parseFunc = parseFunc.default;
+      } else if (parseFunc.default && typeof parseFunc.default.default === 'function') {
+        parseFunc = parseFunc.default.default;
       }
-      return fullText;
     }
 
-    // Fallback for older callable/default export implementations
-    let parse = typeof rawPdf === 'function' ? rawPdf : (rawPdf?.default || rawPdf?.default?.default);
-    if (typeof parse === 'function') {
-      const data = await parse(buffer);
-      const fullText = data.text;
-      if (!fullText || !fullText.trim()) {
-        throw new Error('The PDF appears to be empty or contains only images (OCR is not supported).');
-      }
-      return fullText;
+    if (typeof parseFunc !== 'function') {
+      const keys = parseFunc ? Object.keys(parseFunc) : [];
+      throw new Error(`pdf-parse resolution failed. Parsed type of pdf-parse is "${typeof parseFunc}". Available keys: ${JSON.stringify(keys)}`);
     }
 
-    throw new Error(`pdf-parse resolution failed. Available keys: ${JSON.stringify(Object.keys(rawPdf || {}))}`);
+    const data = await parseFunc(buffer);
+    const fullText = data?.text;
+    
+    if (!fullText || !fullText.trim()) {
+      throw new Error('The PDF appears to be empty or contains only images (OCR is not supported).');
+    }
+    return fullText;
   } catch (error: any) {
     console.error('pdf-parse Error:', error);
     throw new Error('Failed to extract text from PDF file. ' + (error.message || String(error)));
