@@ -10,16 +10,31 @@ import * as pdf from 'pdf-parse';
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // pdf-parse is exported as default in standard commonjs, but TS ES6 definitions use namespace-like bindings
-    // Let's resolve the callable standard dynamically if needed or call pdf.default or pdf directly
-    const parse = (pdf as any).default || pdf;
-    const data = await parse(buffer);
-    const fullText = data.text;
+    const rawPdf: any = pdf;
     
-    if (!fullText || !fullText.trim()) {
-      throw new Error('The PDF appears to be empty or contains only images (OCR is not supported).');
+    // Check if modern PDFParse class is exported
+    if (rawPdf && typeof rawPdf.PDFParse === 'function') {
+      const parser = new rawPdf.PDFParse({ data: new Uint8Array(buffer) });
+      const textResult = await parser.getText();
+      const fullText = textResult.text;
+      if (!fullText || !fullText.trim()) {
+        throw new Error('The PDF appears to be empty or contains only images (OCR is not supported).');
+      }
+      return fullText;
     }
-    return fullText;
+
+    // Fallback for older callable/default export implementations
+    let parse = typeof rawPdf === 'function' ? rawPdf : (rawPdf?.default || rawPdf?.default?.default);
+    if (typeof parse === 'function') {
+      const data = await parse(buffer);
+      const fullText = data.text;
+      if (!fullText || !fullText.trim()) {
+        throw new Error('The PDF appears to be empty or contains only images (OCR is not supported).');
+      }
+      return fullText;
+    }
+
+    throw new Error(`pdf-parse resolution failed. Available keys: ${JSON.stringify(Object.keys(rawPdf || {}))}`);
   } catch (error: any) {
     console.error('pdf-parse Error:', error);
     throw new Error('Failed to extract text from PDF file. ' + (error.message || String(error)));
