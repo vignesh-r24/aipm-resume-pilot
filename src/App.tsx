@@ -113,7 +113,12 @@ export default function App() {
             const errorData = JSON.parse(resText);
             errMsg = errorData.error || errMsg;
           } catch (e) {
-            errMsg = resText || errMsg;
+            if (resText.includes('FUNCTION_INVOCATION_FAILED')) {
+              errMsg = 'A server error occurred (FUNCTION_INVOCATION_FAILED) while parsing the PDF. The file may be too large or the sever crashed.';
+            } else {
+              const strippedText = resText.replace(/<[^>]+>/g, ' ').trim();
+              errMsg = strippedText.length > 200 ? strippedText.substring(0, 200) + '...' : (strippedText || errMsg);
+            }
           }
           throw new Error(errMsg);
         }

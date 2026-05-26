@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
@@ -326,8 +325,18 @@ app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
   }
 });
 
+// Final fallback Error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled Express Error:', err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500).json({ error: 'An unexpected server error occurred: ' + (err.message || String(err)) });
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
