@@ -7,24 +7,28 @@ import admin from 'firebase-admin';
 import fs from 'fs';
 import multer from 'multer';
 
-import { PdfReader } from 'pdfreader';
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    }
+  }
+});
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let fullText = '';
-    new PdfReader().parseBuffer(buffer, (err: any, item: any) => {
-      if (err) return reject(new Error('Failed to extract text from PDF file. ' + err));
-      if (!item) {
-        if (!fullText || !fullText.trim()) {
-          return reject(new Error('The PDF appears to be empty or contains only images (OCR is not supported).'));
-        }
-        return resolve(fullText);
-      }
-      if (item.text) {
-        fullText += item.text + ' ';
-      }
-    });
+  const response = await ai.models.generateContent({
+    model: 'gemini-1.5-flash',
+    contents: [
+      { text: 'Extract and return all the text from this resume faithfully. Output strictly the plain text contained in the resume without any markdown formatting or extra conversational text.'},
+      { inlineData: { data: buffer.toString('base64'), mimeType: 'application/pdf' } }
+    ]
   });
+  const text = response.text;
+  if (!text || text.trim() === '') {
+    throw new Error('The PDF appears to be empty or Gemini could not read it.');
+  }
+  return text;
 }
 
 
@@ -141,15 +145,6 @@ app.get('/api/limits', (req, res) => {
   const todayData = data[today] || { global: 0 };
   const remaining = Math.max(0, GLOBAL_LIMIT - todayData.global);
   res.json({ remaining, limit: GLOBAL_LIMIT });
-});
-
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
 });
 
 const EVALUATION_PROMPT_TEMPLATE = `
