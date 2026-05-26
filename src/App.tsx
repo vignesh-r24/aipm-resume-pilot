@@ -91,19 +91,27 @@ export default function App() {
   }, []);
 
   const handleFile = async (file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      setError('File too large. Please upload something smaller than 5MB.');
+    if (file.size > 3 * 1024 * 1024) {
+      setError('File too large. Please upload a PDF under 3MB or paste the text directly.');
       return;
     }
     setIsParsing(true);
     setError(null);
     try {
       if (file.type === 'application/pdf') {
-        const formData = new FormData();
-        formData.append('file', file);
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = error => reject(error);
+        });
+
         const res = await fetch('/api/parse-pdf', {
           method: 'POST',
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ pdfBase64: base64 }),
         });
 
         if (!res.ok) {

@@ -32,7 +32,7 @@ if (!admin.apps.length) {
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   const ai = getAi();
   const response = await ai.models.generateContent({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.5-flash',
     contents: [
       { text: 'Extract and return all the text from this resume faithfully. Output strictly the plain text contained in the resume without any markdown formatting or extra conversational text.'},
       { inlineData: { data: buffer.toString('base64'), mimeType: 'application/pdf' } }
@@ -210,14 +210,14 @@ You must return a JSON object that strictly follows this schema:
 }
 `;
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
-
-app.post('/api/parse-pdf', upload.single('file'), async (req, res) => {
+app.post('/api/parse-pdf', async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded.' });
+    const { pdfBase64 } = req.body;
+    if (!pdfBase64) {
+      return res.status(400).json({ error: 'No PDF provided.' });
     }
-    const text = await extractTextFromPDF(req.file.buffer);
+    const buffer = Buffer.from(pdfBase64, 'base64');
+    const text = await extractTextFromPDF(buffer);
     res.json({ text });
   } catch (error: any) {
     console.error('PDF Parse Error:', error);
@@ -237,7 +237,7 @@ app.post('/api/evaluate', verifyAuth, checkRateLimits, async (req, res) => {
       .replace('{{job_description}}', jobDescription)
       .replace('{{resume}}', resume);
 
-    const modelsToTry = ["gemini-3.5-flash", "gemini-1.5-flash"];
+    const modelsToTry = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-pro"];
     let response: any = null;
     let evalError: any = null;
 
