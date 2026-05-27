@@ -25,6 +25,16 @@ export const trackEvent = async (eventName: string, eventParams?: Record<string,
 
 
 export const signInWithGoogle = async () => {
+  const isInAppBrowser = () => {
+    const ua = navigator.userAgent || navigator.vendor || (window as any).opera;
+    // Common in-app browsers we want to warn about
+    return /Instagram|LinkedIn|FBAN|FBAV|Twitter|Line|MicroMessenger|Snapchat|TikTok|Threads/i.test(ua);
+  };
+
+  if (isInAppBrowser()) {
+    throw new Error('Google Sign-In is blocked in this app window. Please tap the menu (...) and select "Open in Default Browser", "Open in Safari", or "Open in Chrome" to continue.');
+  }
+
   try {
     await signInWithRedirect(auth, googleProvider);
   } catch (error: any) {
