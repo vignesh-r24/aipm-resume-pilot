@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, browserPopupRedirectResolver } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithRedirect, signOut, browserPopupRedirectResolver } from 'firebase/auth';
 import { getAnalytics, isSupported, logEvent } from 'firebase/analytics';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -26,14 +26,10 @@ export const trackEvent = async (eventName: string, eventParams?: Record<string,
 
 export const signInWithGoogle = async () => {
   try {
-    const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
-    return result.user;
+    await signInWithRedirect(auth, googleProvider);
   } catch (error: any) {
-    if (error.code === 'auth/unauthorized-domain') {
-       console.error(`Popup failed with unauthorized-domain. Please ensure your domain (${window.location.hostname}) is whitelisted.`);
-    }
     console.error("Error signing in with Google", error);
-    throw new Error(`Sign-in failed: ${error.message}. Please ensure ${window.location.hostname} is added to Authorized Domains in Firebase Auth settings.`);
+    throw new Error(`Sign-in failed: ${error.message}`);
   }
 };
 
