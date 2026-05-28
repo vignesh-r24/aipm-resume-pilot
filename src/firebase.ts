@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, browserPopupRedirectResolver } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getAnalytics, isSupported, logEvent } from 'firebase/analytics';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -26,7 +26,7 @@ export const trackEvent = async (eventName: string, eventParams?: Record<string,
 
 export const signInWithGoogle = async () => {
   try {
-    const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+    const result = await signInWithPopup(auth, googleProvider);
     return result.user;
   } catch (error: any) {
     if (error.code === 'auth/unauthorized-domain') {
