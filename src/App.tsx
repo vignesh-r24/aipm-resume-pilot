@@ -236,11 +236,7 @@ export default function App() {
                   try {
                     await signInWithGoogle();
                   } catch (e: any) {
-                    const msg = e.message || "Sign-in failed due to an unknown error.";
-                    setError(msg);
-                    if (msg.includes("blocked in this app window")) {
-                      window.alert(msg);
-                    }
+                    setError(e.message || "Sign-in failed due to an unknown error.");
                   }
                 }}
                 className="px-4 py-2 bg-stone-900 text-white rounded-full text-sm font-medium hover:bg-stone-800 transition-colors shadow-md flex items-center gap-2"
